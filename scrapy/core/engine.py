@@ -392,6 +392,52 @@ class ExecutionEngine:
         finally:
             self._slot.nextcall.schedule()
 
+    async def async_download(self, request: Request) -> Response:
+        """Async version of download() that returns a Response as result, only downloader middlewares are applied"""
+        if self.spider is None:
+            raise RuntimeError(f"No open spider to crawl: {request}")
+        try:
+            response_or_request = await self._async_download(request)
+        finally:
+            assert self._slot is not None
+            self._slot.remove_request(request)
+        if isinstance(response_or_request, Request):
+            return await self.async_download(response_or_request)
+        return response_or_request
+
+    async def _async_download(self, request: Request) -> Response | Request:
+        """Async version of _download()"""
+        assert self._slot is not None
+        assert self.spider is not None
+
+        self._slot.add_request(request)
+        try:
+            result: Response | Request = await self.downloader.async_fetch(
+                request, self.spider
+            )
+            if not isinstance(result, (Response, Request)):
+                raise TypeError(
+                    f"Incorrect type: expected Response or Request, got {type(result)}: {result!r}"
+                )
+            if isinstance(result, Response):
+                if result.request is None:
+                    result.request = request
+                assert self.spider is not None
+                logkws = self.logformatter.crawled(result.request, result, self.spider)
+                if logkws is not None:
+                    logger.log(
+                        *logformatter_adapter(logkws), extra={"spider": self.spider}
+                    )
+                await self.signals.send_catch_log_async(
+                    signal=signals.response_received,
+                    response=result,
+                    request=result.request,
+                    spider=self.spider,
+                )
+            return result
+        finally:
+            self._slot.nextcall.schedule()
+
     @deferred_f_from_coro_f
     async def open_spider(
         self,

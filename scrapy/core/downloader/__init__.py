@@ -129,6 +129,27 @@ class Downloader:
         finally:
             self.active.remove(request)
 
+    async def async_fetch(self, request: Request, spider: Spider) -> Response | Request:
+        """Asynchronous version of fetch that uses async/await instead of Twisted deferreds.
+
+        Args:
+            request: The request to fetch
+            spider: The spider making the request
+
+        Returns:
+            The response or request after middleware processing
+        """
+        self.active.add(request)
+        try:
+            # Convert the middleware download to async
+            return await maybe_deferred_to_future(
+                mustbe_deferred(
+                    self.middleware.download, self._enqueue_request, request, spider
+                )
+            )
+        finally:
+            self.active.remove(request)
+
     def needs_backout(self) -> bool:
         return len(self.active) >= self.total_concurrency
 
