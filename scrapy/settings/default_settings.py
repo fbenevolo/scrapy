@@ -358,3 +358,9 @@ URLLENGTH_LIMIT = 2083
 USER_AGENT = f"Scrapy/{import_module('scrapy').__version__} (+https://scrapy.org)"
 
 WARN_ON_GENERATOR_RETURN_VALUE = True
+
+# To use the HTTPX-based download handler, uncomment and adjust the following:
+# DOWNLOAD_HANDLERS = {
+#     'http': 'scrapy.core.downloader.handlers.httpx.HTTPXDownloadHandler',
+#     'https': 'scrapy.core.downloader.handlers.httpx.HTTPXDownloadHandler',
+# }
